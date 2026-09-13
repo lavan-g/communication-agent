@@ -1,0 +1,22 @@
+{
+  "name": "communication-agent",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Real-Time AI Communication, Storytelling & Public Speaking Coach",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently --names \"api,web\" --prefix-colors \"cyan,magenta\" \"npm run dev --workspace=apps/api\" \"npm run dev --workspace=apps/web\"",
+    "build": "npm run build --workspace=packages/types && npm run build --workspaces --if-present",
+    "type-check": "npm run type-check --workspaces --if-present",
+    "install:all": "npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
