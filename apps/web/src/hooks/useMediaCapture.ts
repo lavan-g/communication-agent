@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, type RefObject } from 'react';
 
 interface UseMediaCaptureReturn {
   stream: MediaStream | null;
@@ -10,7 +10,7 @@ interface UseMediaCaptureReturn {
   stopCapture: () => void;
   toggleCamera: () => void;
   toggleMic: () => void;
-  videoRef: React.RefObject<HTMLVideoElement | null>;
+  videoRef: RefObject<HTMLVideoElement>;
 }
 
 export function useMediaCapture(): UseMediaCaptureReturn {
