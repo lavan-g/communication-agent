@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, type RefObject } from 'react';
+import { useState, useRef, useCallback, useEffect, type RefObject } from 'react';
 
 interface UseMediaCaptureReturn {
   stream: MediaStream | null;
@@ -21,6 +21,17 @@ export function useMediaCapture(): UseMediaCaptureReturn {
   const [isLoading, setIsLoading] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
+  // Whenever we get a new stream AND the video element is mounted, attach it.
+  // This runs after React re-renders so the <video> element is guaranteed to exist.
+  useEffect(() => {
+    if (stream && videoRef.current && cameraEnabled) {
+      videoRef.current.srcObject = stream;
+      videoRef.current.play().catch(() => {
+        // autoplay may be blocked — the `autoPlay` prop on <video> handles this
+      });
+    }
+  }, [stream, cameraEnabled]);
+
   const startCapture = useCallback(async (options?: { camera?: boolean; mic?: boolean }) => {
     const { camera = false, mic = true } = options || {};
     setIsLoading(true);
@@ -33,15 +44,14 @@ export function useMediaCapture(): UseMediaCaptureReturn {
       setStream(mediaStream);
       setCameraEnabled(camera);
       setMicEnabled(mic);
-      
-      if (videoRef.current && camera) {
-        videoRef.current.srcObject = mediaStream;
-      }
+      // NOTE: We do NOT assign videoRef.current.srcObject here because the
+      // <video> element may not be in the DOM yet (rendered after session becomes active).
+      // The useEffect above handles the assignment after React re-renders.
     } catch (err: any) {
       if (err.name === 'NotAllowedError') {
-        setError('Permissions denied. Please allow camera/microphone access.');
+        setError('Camera/microphone permissions denied. Please allow access and try again.');
       } else if (err.name === 'NotFoundError') {
-        setError('Camera or microphone not found.');
+        setError('Camera or microphone not found on this device.');
       } else {
         setError(err.message || 'Error accessing media devices.');
       }
@@ -53,12 +63,12 @@ export function useMediaCapture(): UseMediaCaptureReturn {
   const stopCapture = useCallback(() => {
     if (stream) {
       stream.getTracks().forEach((track) => track.stop());
-      setStream(null);
-      setCameraEnabled(false);
-      setMicEnabled(false);
-      if (videoRef.current) {
-        videoRef.current.srcObject = null;
-      }
+    }
+    setStream(null);
+    setCameraEnabled(false);
+    setMicEnabled(false);
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
     }
   }, [stream]);
 
@@ -69,6 +79,10 @@ export function useMediaCapture(): UseMediaCaptureReturn {
         const enabled = !videoTracks[0].enabled;
         videoTracks[0].enabled = enabled;
         setCameraEnabled(enabled);
+        // If re-enabling, re-attach srcObject in case it was cleared
+        if (enabled && videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
       }
     }
   }, [stream]);

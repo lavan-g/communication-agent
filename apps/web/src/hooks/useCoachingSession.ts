@@ -38,7 +38,7 @@ export function useCoachingSession() {
           await analyzeChunk(sessionId, {
             text,
             isFinal: true,
-            transcriptWindow: []
+            transcriptWindow: [],
           });
         } catch (err) {
           console.error('Failed to analyze chunk', err);
