@@ -21,10 +21,13 @@ export default function ReportPage() {
   const [report, setReport] = useState<SessionReport | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const [error, setError] = useState<string | null>(null);
+
   useEffect(() => {
     if (!sessionId) return;
     let mounted = true;
-    let pollCount = 0;
+    let attempts = 0;
+    const MAX_ATTEMPTS = 6; // ~15 seconds total
 
     const fetchReport = async () => {
       try {
@@ -34,15 +37,19 @@ export default function ReportPage() {
           setLoading(false);
         }
       } catch (err: any) {
-        if (err.message?.includes('404') && pollCount < 12) {
-          pollCount++;
+        if (!mounted) return;
+        attempts++;
+        if (attempts < MAX_ATTEMPTS) {
+          // Retry with backoff — report may still be generating
           setTimeout(fetchReport, 2500);
         } else {
-          if (mounted) setLoading(false);
+          setLoading(false);
+          setError('Could not load the report. The session may not have ended properly.');
         }
       }
     };
 
+    // Fetch immediately — report is saved before navigation happens
     fetchReport();
     return () => { mounted = false; };
   }, [sessionId]);
@@ -50,9 +57,25 @@ export default function ReportPage() {
   if (loading || !report) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center h-full pt-24">
-        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-blue-500 mb-6" />
-        <h2 className="text-xl text-gray-300 mb-2">Generating your report...</h2>
-        <p className="text-gray-500 text-sm">Analyzing speech patterns, clarity, and storytelling.</p>
+        {error ? (
+          <div className="text-center">
+            <div className="text-4xl mb-4">⚠️</div>
+            <h2 className="text-xl text-red-400 mb-2">Report Unavailable</h2>
+            <p className="text-gray-500 text-sm max-w-sm mb-6">{error}</p>
+            <button
+              onClick={() => navigate('/session')}
+              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors"
+            >
+              Start New Session
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-blue-500 mb-6" />
+            <h2 className="text-xl text-gray-300 mb-2">Generating your report...</h2>
+            <p className="text-gray-500 text-sm">Analyzing speech patterns, clarity, and storytelling.</p>
+          </>
+        )}
       </div>
     );
   }
