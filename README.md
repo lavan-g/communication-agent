@@ -1,55 +1,58 @@
-# Communication Agent
+# Voxa
 
-> **A Real-Time AI Communication, Storytelling & Public Speaking Coach**
+> **Your voice, elevated.** — AI-powered communication, storytelling & public speaking coach.
 
-Built with Gemini 2.0 Flash multimodal intelligence. The goal isn't to generate better text for you — it's to make **you** a dramatically better communicator.
+Voxa is a real-time coaching application that listens as you speak, gives live nudges via Gemini 2.0 Flash, and generates a detailed post-session report to help you improve over time.
 
 ---
 
-## Quick Start
+## What Voxa does
+
+- 🎙️ **Live session coaching** — speaks back to you with micro-interventions as you talk (filler words, rambling, weak structure, storytelling gaps)
+- 📊 **Post-session reports** — full breakdown of clarity, structure, storytelling, engagement, conciseness, and confidence
+- 📖 **Story Bank** — catalogue your best personal stories with structured fields so you can deploy them in any conversation
+- 🧠 **Learning Stages 1–8** — Voxa adapts what it coaches you on based on where you are in your journey
+- 👤 **Profile tracking** — your strengths, weaknesses, and tendencies are tracked across sessions
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | Vite + React 18 + TypeScript + Tailwind CSS v4 |
+| State | Zustand |
+| Backend | Express + TypeScript + SQLite (better-sqlite3) |
+| AI | Gemini 2.0 Flash (`@google/genai`) |
+| Realtime | Web Speech API + Server-Sent Events |
+
+---
+
+## Run locally
 
 ```bash
-# 1. Install dependencies
+cd communication-agent
 npm install
-
-# 2. Configure API key
-cp apps/api/.env.example apps/api/.env
-# Edit apps/api/.env and add your GEMINI_API_KEY
-
-# 3. Start both servers
 npm run dev
 ```
 
-- Frontend: http://localhost:5173
-- Backend API: http://localhost:3001
+- **Frontend:** http://localhost:5173
+- **API:** http://localhost:3001
+- **Health:** http://localhost:3001/health
 
 ---
 
-## Architecture
+## Project structure
 
 ```
 communication-agent/
-├── apps/
-│   ├── web/      # Vite + React 18 + TypeScript + Tailwind CSS
-│   └── api/      # Express + TypeScript + SQLite + Gemini
-└── packages/
-    └── types/    # Shared TypeScript types
+├── packages/types/          # Shared TypeScript types & enums
+├── apps/api/                # Express backend
+│   ├── src/db/              # SQLite schema
+│   ├── src/services/        # Gemini, context engine, coaching decider, SSE
+│   └── src/routes/          # session, profile, stories
+└── apps/web/                # React frontend
+    ├── src/hooks/           # useCoachingSession, useSpeechRecognition, useSSE
+    ├── src/pages/           # Dashboard, Session, Report, Profile, Stories
+    └── src/components/      # CoachingOverlay, TranscriptFeed, Sidebar
 ```
-
-## Phase 1 — MVP Features
-
-- ✅ Live microphone capture + real-time transcription
-- ✅ Camera feed (for presence awareness)
-- ✅ Gemini-powered communication analysis
-- ✅ 4-level intervention hierarchy (no constant interruption)
-- ✅ Live coaching overlay (low distraction)
-- ✅ Post-session reports
-- ✅ Communication profile
-- ✅ Story Bank (scaffold for Phase 3)
-
-## Privacy
-
-- Audio is transcribed locally via Web Speech API — no audio recorded to disk
-- Transcripts stored locally in SQLite on your machine
-- Gemini receives text only (not raw audio/video)
-- Full data deletion available from the Profile page
