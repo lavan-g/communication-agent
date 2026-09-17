@@ -22,6 +22,6 @@ app.use('/api/profile', profileRouter);
 app.use('/api/stories', storiesRouter);
 
 app.listen(PORT, () => {
-  console.log(`\n🎙️  Communication Coach API running on http://localhost:${PORT}`);
+  console.log(`\n🎙️  Voxa API running on http://localhost:${PORT}`);
   console.log(`   Gemini API: ${process.env.GEMINI_API_KEY ? '✅ configured' : '❌ missing GEMINI_API_KEY'}`);
 });
