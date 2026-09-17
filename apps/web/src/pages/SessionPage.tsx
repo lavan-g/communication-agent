@@ -33,9 +33,9 @@ export default function SessionPage() {
   };
 
   const handleEnd = async () => {
-    const report = await endSession();
-    if (report) {
-      navigate(`/report/${report.sessionId}`);
+    const result = await endSession();
+    if (result?.sessionId) {
+      navigate(`/report/${result.sessionId}`);
     }
   };
 
