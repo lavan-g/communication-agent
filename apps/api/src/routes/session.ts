@@ -183,6 +183,17 @@ sessionRouter.post('/:id/end', async (req, res) => {
   const events = db.prepare('SELECT * FROM coaching_events WHERE session_id = ? ORDER BY timestamp ASC').all(sessionId) as any[];
   const userProfile = db.prepare('SELECT * FROM user_profile WHERE id = 1').get() as any;
 
+  // Compute word count and duration from transcript + timestamps
+  const fullText = transcripts.map((c: any) => c.text).join(' ');
+  const wordCount = fullText.trim() ? fullText.trim().split(/\s+/).length : 0;
+  const startedAt = session?.started_at ? new Date(session.started_at).getTime() : 0;
+  const endedAtMs = new Date(endedAt).getTime();
+  const durationSeconds = startedAt ? Math.round((endedAtMs - startedAt) / 1000) : 0;
+
+  db.prepare('UPDATE sessions SET word_count = ?, duration_seconds = ? WHERE id = ?').run(
+    wordCount, durationSeconds, sessionId
+  );
+
   const report = await geminiService.generatePostSessionReport({
     session,
     transcript: transcripts,

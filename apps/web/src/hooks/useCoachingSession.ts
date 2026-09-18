@@ -51,19 +51,22 @@ export function useCoachingSession() {
   });
 
   const startSession = useCallback(
-    async (mode: SessionMode, context?: SessionContext) => {
+    async (mode: SessionMode, context?: SessionContext & { camera?: boolean }) => {
       try {
         setError(null);
-        await media.startCapture({ camera: true, mic: true });
+        const withCamera = context?.camera ?? false;
+        // Strip camera from the context sent to backend — it's a frontend-only option
+        const { camera: _camera, ...sessionContext } = context ?? {};
+        await media.startCapture({ camera: withCamera, mic: true });
 
-        const session = await createSession({ mode, context });
+        const session = await createSession({ mode, context: sessionContext });
 
-        // ─── Store the ID in the ref immediately so it's always accessible ───
+        // Store the ID in the ref immediately so it's always accessible
         activeSessionIdRef.current = session.id;
 
         store.setCurrentSession(session);
         store.setSessionMode(mode);
-        if (context) store.setSessionContext(context);
+        if (sessionContext) store.setSessionContext(sessionContext);
 
         setSseUrl(`/api/sessions/${session.id}/stream`);
         store.setSessionActive(true);
