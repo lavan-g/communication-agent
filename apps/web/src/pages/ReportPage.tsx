@@ -1,46 +1,71 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getSessionReport } from '../services/api.service';
+import { ArrowLeft, Mic, MessageSquare, Lightbulb, Dumbbell, CheckCircle2, AlertCircle, BarChart3 } from 'lucide-react';
+import { getSessionReport, type SessionReportFull } from '../services/api.service';
 import type { SessionReport } from '@communication-agent/types';
-import { CheckCircle2, TrendingUp, Mic, ArrowRight, BookOpen, Zap } from 'lucide-react';
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function formatDuration(seconds: number) {
+  if (!seconds) return '—';
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  if (m === 0) return `${s}s`;
+  return `${m}m ${s > 0 ? `${s}s` : ''}`.trim();
+}
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString('en-US', {
+    weekday: 'short', month: 'short', day: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
+}
 
 const SCORE_COLOR: Record<string, string> = {
-  strong: 'text-green-400',
-  moderate: 'text-yellow-400',
-  developing: 'text-gray-400',
+  strong:     'text-emerald-400 bg-emerald-950/40 border-emerald-900/50',
+  moderate:   'text-amber-400 bg-amber-950/40 border-amber-900/50',
+  developing: 'text-violet-400 bg-violet-950/40 border-violet-900/50',
 };
-const SCORE_LABEL: Record<string, string> = {
-  strong: 'Strong ✓',
-  moderate: 'Moderate',
-  developing: 'Developing',
+
+const SCORE_BAR: Record<string, number> = {
+  strong: 100, moderate: 60, developing: 30,
 };
+
+const SCORE_BAR_COLOR: Record<string, string> = {
+  strong: 'bg-emerald-500', moderate: 'bg-amber-500', developing: 'bg-violet-500',
+};
+
+const SCORE_LABELS: Record<string, string> = {
+  clarity: 'Clarity', structure: 'Structure', storytelling: 'Storytelling',
+  engagement: 'Engagement', conciseness: 'Conciseness', confidence: 'Confidence',
+};
+
+// ─── Main component ────────────────────────────────────────────────────────────
 
 export default function ReportPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
-  const [report, setReport] = useState<SessionReport | null>(null);
+  const [data, setData] = useState<SessionReportFull | null>(null);
   const [loading, setLoading] = useState(true);
-
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!sessionId) return;
     let mounted = true;
     let attempts = 0;
-    const MAX_ATTEMPTS = 6; // ~15 seconds total
+    const MAX_ATTEMPTS = 6;
 
     const fetchReport = async () => {
       try {
-        const data = await getSessionReport(sessionId);
-        if (data && mounted) {
-          setReport(data);
+        const result = await getSessionReport(sessionId);
+        if (mounted) {
+          setData(result);
           setLoading(false);
         }
-      } catch (err: any) {
+      } catch {
         if (!mounted) return;
         attempts++;
         if (attempts < MAX_ATTEMPTS) {
-          // Retry with backoff — report may still be generating
           setTimeout(fetchReport, 2500);
         } else {
           setLoading(false);
@@ -49,140 +74,279 @@ export default function ReportPage() {
       }
     };
 
-    // Fetch immediately — report is saved before navigation happens
     fetchReport();
     return () => { mounted = false; };
   }, [sessionId]);
 
-  if (loading || !report) {
+  // ── Loading / error states ──────────────────────────────────────────────────
+  if (loading || (!data && !error)) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center h-full pt-24">
-        {error ? (
-          <div className="text-center">
-            <div className="text-4xl mb-4">⚠️</div>
-            <h2 className="text-xl text-red-400 mb-2">Report Unavailable</h2>
-            <p className="text-gray-500 text-sm max-w-sm mb-6">{error}</p>
-            <button
-              onClick={() => navigate('/session')}
-              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors"
-            >
-              Start New Session
-            </button>
-          </div>
-        ) : (
-          <>
-            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-blue-500 mb-6" />
-            <h2 className="text-xl text-gray-300 mb-2">Generating your report...</h2>
-            <p className="text-gray-500 text-sm">Analyzing speech patterns, clarity, and storytelling.</p>
-          </>
-        )}
+      <div className="flex flex-col items-center justify-center h-full gap-4">
+        <div className="animate-spin rounded-full h-9 w-9 border-t-2 border-violet-500" />
+        <p className="text-gray-400 text-sm">Generating your coaching summary…</p>
       </div>
     );
   }
 
-  return (
-    <div className="max-w-4xl mx-auto p-8 py-12">
-      {/* Header */}
-      <div className="flex justify-between items-end mb-10">
-        <div>
-          <h1 className="text-3xl font-semibold text-white mb-2">Session Report</h1>
-          <p className="text-gray-400 text-sm">
-            {new Date(report.generatedAt).toLocaleDateString(undefined, { dateStyle: 'long' })}
-          </p>
-        </div>
+  if (error || !data) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-3">
+        <AlertCircle size={32} className="text-red-500" />
+        <p className="text-gray-300 font-medium">Report unavailable</p>
+        <p className="text-gray-500 text-sm max-w-xs text-center">{error}</p>
         <button
           onClick={() => navigate('/session')}
-          className="text-blue-400 hover:text-blue-300 font-medium flex items-center gap-2 text-sm"
+          className="mt-4 px-5 py-2 bg-violet-600 hover:bg-violet-500 text-white rounded-lg text-sm font-medium"
         >
-          New Session <ArrowRight size={15} />
+          Start new session
         </button>
       </div>
+    );
+  }
 
-      {/* What you did well + Biggest opportunity */}
-      <div className="grid grid-cols-2 gap-6 mb-8">
-        <div className="bg-green-950/20 border border-green-900/40 rounded-xl p-6">
-          <h3 className="text-green-400 font-medium flex items-center gap-2 mb-4 text-sm uppercase tracking-wider">
-            <CheckCircle2 size={15} /> Well Done
-          </h3>
-          <ul className="space-y-2">
-            {report.wellDone.map((item, i) => (
-              <li key={i} className="text-gray-300 text-sm leading-relaxed flex items-start gap-2">
-                <span className="text-green-500 mt-1 flex-none">•</span>
-                {item}
-              </li>
-            ))}
-          </ul>
+  const { report, session, transcripts, coachingEvents } = data;
+  const fullTranscript = (transcripts ?? []).map((c: any) => c.text).join(' ').trim();
+  const wordCount = session?.word_count ?? (fullTranscript ? fullTranscript.split(/\s+/).length : 0);
+  const duration = session?.duration_seconds ?? 0;
+  const hasRealData = fullTranscript.length > 0;
+
+  // Filler words from coaching events fired during session
+  const fillerHits = (coachingEvents ?? []).filter((e: any) => e.category === 'filler_words');
+  const totalFillers = report.speechPatterns?.fillerWordCount ?? fillerHits.length;
+
+  return (
+    <div className="h-full overflow-y-auto">
+      <div className="max-w-3xl mx-auto px-6 py-8 space-y-6">
+
+        {/* ── Header ──────────────────────────────────────────────────── */}
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => navigate('/')}
+            className="flex items-center gap-2 text-gray-500 hover:text-gray-300 text-sm transition-colors"
+          >
+            <ArrowLeft size={16} />
+            Dashboard
+          </button>
+          <span className="text-xs text-gray-600">
+            {session?.started_at ? formatDate(session.started_at) : ''}
+          </span>
         </div>
 
-        <div className="bg-orange-950/20 border border-orange-900/40 rounded-xl p-6">
-          <h3 className="text-orange-400 font-medium flex items-center gap-2 mb-4 text-sm uppercase tracking-wider">
-            <TrendingUp size={15} /> Biggest Opportunity
-          </h3>
-          <p className="text-gray-300 text-sm leading-relaxed mb-3">
-            {report.biggestOpportunity.observation}
+        <div>
+          <h1 className="text-2xl font-semibold text-white">Session Report</h1>
+          <p className="text-gray-500 text-sm mt-1">
+            {session?.mode ? `${session.mode.charAt(0).toUpperCase()}${session.mode.slice(1)} session` : 'Session'}
+            {duration > 0 && <> · {formatDuration(duration)}</>}
+            {wordCount > 0 && <> · {wordCount} words</>}
           </p>
-          <p className="text-xs text-gray-500 italic border-t border-gray-800 pt-3">
-            💡 {report.biggestOpportunity.principle}
-          </p>
         </div>
-      </div>
 
-      {/* Dimension scores */}
-      <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 mb-8">
-        <h3 className="text-base font-medium text-white mb-5">Dimension Scores</h3>
-        <div className="grid grid-cols-3 gap-3">
-          {Object.entries(report.scores).map(([key, score]) => (
-            <div key={key} className="p-4 bg-gray-950 rounded-lg border border-gray-800/50">
-              <div className="text-xs text-gray-500 capitalize mb-1">{key}</div>
-              <div className={`font-medium text-sm ${SCORE_COLOR[score] || 'text-gray-400'}`}>
-                {SCORE_LABEL[score] || score}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Today's lesson */}
-      <div className="bg-blue-950/20 border border-blue-900/40 rounded-xl p-6 mb-8">
-        <h3 className="text-blue-400 font-medium flex items-center gap-2 mb-3 text-sm uppercase tracking-wider">
-          <BookOpen size={15} /> Today's One Lesson
-        </h3>
-        <p className="text-gray-200 text-base leading-relaxed">{report.oneLesson}</p>
-      </div>
-
-      {/* Today's exercise */}
-      {report.oneExercise && (
-        <div className="bg-purple-950/20 border border-purple-900/40 rounded-xl p-6 mb-8">
-          <h3 className="text-purple-400 font-medium flex items-center gap-2 mb-3 text-sm uppercase tracking-wider">
-            <Zap size={15} /> Practice Exercise · {report.oneExercise.duration}
-          </h3>
-          <p className="text-sm text-gray-400 uppercase tracking-wider mb-2">{report.oneExercise.type}</p>
-          <p className="text-gray-200 text-sm leading-relaxed">{report.oneExercise.instruction}</p>
-        </div>
-      )}
-
-      {/* Speech patterns */}
-      {report.speechPatterns && (
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-          <h3 className="text-base font-medium text-white mb-5 flex items-center gap-2">
-            <Mic size={16} className="text-gray-500" /> Speech Patterns
-          </h3>
-          <div className="grid grid-cols-3 gap-6">
+        {/* ── No transcript warning ─────────────────────────────────── */}
+        {!hasRealData && (
+          <div className="flex items-start gap-3 px-4 py-3 bg-amber-950/30 border border-amber-900/40 rounded-xl text-sm">
+            <AlertCircle size={16} className="text-amber-400 mt-0.5 flex-shrink-0" />
             <div>
-              <div className="text-3xl font-light text-white mb-1">{report.speechPatterns.fillerWordCount}</div>
-              <div className="text-xs text-gray-500 uppercase tracking-wider">Filler Words</div>
-            </div>
-            <div>
-              <div className="text-3xl font-light text-white mb-1">{report.speechPatterns.ramblingMoments}</div>
-              <div className="text-xs text-gray-500 uppercase tracking-wider">Rambling Moments</div>
-            </div>
-            <div>
-              <div className="text-3xl font-light text-white mb-1">{report.speechPatterns.repetitions.length}</div>
-              <div className="text-xs text-gray-500 uppercase tracking-wider">Repetitions</div>
+              <p className="text-amber-300 font-medium">No speech was captured in this session.</p>
+              <p className="text-amber-500/80 text-xs mt-0.5">
+                Voxa didn't receive any audio. Make sure you click "Begin Session", allow mic access, and speak clearly. The report below is a template.
+              </p>
             </div>
           </div>
-        </div>
+        )}
+
+        {/* ── What you said (transcript) ────────────────────────────── */}
+        {hasRealData && (
+          <Section icon={<Mic size={16} />} title="What you said" accent="violet">
+            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+              {(transcripts as any[]).map((chunk: any, i: number) => (
+                <p key={i} className="text-gray-300 text-sm leading-relaxed">
+                  {chunk.text}
+                </p>
+              ))}
+            </div>
+            {transcripts.length === 0 && (
+              <p className="text-gray-600 text-sm italic">No transcript recorded.</p>
+            )}
+          </Section>
+        )}
+
+        {/* ── Coaching events during session ────────────────────────── */}
+        {(coachingEvents ?? []).length > 0 && (
+          <Section icon={<MessageSquare size={16} />} title="What Voxa noticed" accent="cyan">
+            <div className="space-y-3">
+              {(coachingEvents as any[]).map((evt: any, i: number) => (
+                <CoachingEventRow key={i} event={evt} />
+              ))}
+            </div>
+          </Section>
+        )}
+
+        {/* ── Speech patterns (fillers + rambling) ─────────────────── */}
+        <Section icon={<BarChart3 size={16} />} title="Speech patterns" accent="amber">
+          <div className="grid grid-cols-2 gap-3">
+            <StatCard label="Filler words" value={totalFillers} unit="caught" good={totalFillers === 0} />
+            <StatCard label="Rambling moments" value={report.speechPatterns?.ramblingMoments ?? 0} unit="detected" good={(report.speechPatterns?.ramblingMoments ?? 0) === 0} />
+            <StatCard label="Words spoken" value={wordCount} unit="words" />
+            <StatCard label="Duration" value={formatDuration(duration)} />
+          </div>
+
+          {/* Individual filler words breakdown */}
+          {Object.keys(report.speechPatterns?.fillerWords ?? {}).length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {Object.entries(report.speechPatterns.fillerWords).map(([word, count]) => (
+                <span key={word} className="px-2.5 py-1 rounded-full bg-amber-950/40 border border-amber-900/40 text-amber-400 text-xs">
+                  "{word}" × {count as number}
+                </span>
+              ))}
+            </div>
+          )}
+        </Section>
+
+        {/* ── What you did well ─────────────────────────────────────── */}
+        {(report.wellDone ?? []).length > 0 && (
+          <Section icon={<CheckCircle2 size={16} />} title="What you did well" accent="emerald">
+            <ul className="space-y-2">
+              {report.wellDone.map((item, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm text-gray-300">
+                  <span className="text-emerald-500 mt-0.5">✓</span>
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </Section>
+        )}
+
+        {/* ── Biggest opportunity ───────────────────────────────────── */}
+        {report.biggestOpportunity && (
+          <Section icon={<Lightbulb size={16} />} title="Biggest opportunity" accent="violet" highlight>
+            <p className="text-gray-200 font-medium text-sm">{report.biggestOpportunity.observation}</p>
+            {report.biggestOpportunity.principle && (
+              <p className="text-violet-300 text-sm mt-2 italic">"{report.biggestOpportunity.principle}"</p>
+            )}
+          </Section>
+        )}
+
+        {/* ── Today's exercise ──────────────────────────────────────── */}
+        {report.oneExercise && (
+          <Section icon={<Dumbbell size={16} />} title="Practice today" accent="cyan">
+            <div className="flex items-start gap-3">
+              <div className="flex-1">
+                <p className="text-xs font-semibold text-cyan-400 uppercase tracking-wider mb-1">
+                  {report.oneExercise.type}
+                  {report.oneExercise.duration && <span className="text-gray-600 ml-2 normal-case">· {report.oneExercise.duration}</span>}
+                </p>
+                <p className="text-gray-300 text-sm">{report.oneExercise.instruction}</p>
+              </div>
+            </div>
+          </Section>
+        )}
+
+        {/* ── Scores ───────────────────────────────────────────────── */}
+        {report.scores && (
+          <Section icon={<BarChart3 size={16} />} title="Scores" accent="gray">
+            <div className="space-y-3">
+              {Object.entries(report.scores).map(([key, value]) => (
+                <ScoreRow key={key} label={SCORE_LABELS[key] ?? key} value={value as string} />
+              ))}
+            </div>
+            {!hasRealData && (
+              <p className="text-xs text-gray-600 mt-3 italic">These scores are estimates — speak during your session for accurate analysis.</p>
+            )}
+          </Section>
+        )}
+
+        {/* ── The one lesson ────────────────────────────────────────── */}
+        {report.oneLesson && (
+          <div className="px-6 py-5 bg-violet-950/20 border border-violet-900/30 rounded-2xl">
+            <p className="text-xs text-violet-400 font-semibold uppercase tracking-widest mb-2">One lesson from this session</p>
+            <p className="text-gray-200 text-base leading-relaxed">"{report.oneLesson}"</p>
+          </div>
+        )}
+
+        <div className="pb-8" />
+      </div>
+    </div>
+  );
+}
+
+// ─── Sub-components ────────────────────────────────────────────────────────────
+
+const ACCENT: Record<string, string> = {
+  violet: 'border-violet-900/40 text-violet-400',
+  cyan:   'border-cyan-900/40 text-cyan-400',
+  amber:  'border-amber-900/40 text-amber-400',
+  emerald:'border-emerald-900/40 text-emerald-400',
+  gray:   'border-gray-800 text-gray-400',
+};
+
+function Section({
+  icon, title, accent = 'gray', highlight = false, children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  accent?: string;
+  highlight?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={`rounded-2xl border p-5 ${highlight ? 'bg-violet-950/10 border-violet-900/40' : 'bg-gray-900/50 border-gray-800'}`}>
+      <div className={`flex items-center gap-2 mb-4 ${ACCENT[accent] ?? ACCENT.gray}`}>
+        {icon}
+        <span className="text-xs font-semibold uppercase tracking-wider">{title}</span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function CoachingEventRow({ event }: { event: any }) {
+  const categoryLabel: Record<string, string> = {
+    filler_words: 'Filler word', rambling: 'Rambling', clarity: 'Clarity',
+    structure: 'Structure', storytelling: 'Storytelling', positive: 'Well done',
+    conciseness: 'Conciseness', engagement: 'Engagement', language: 'Language',
+  };
+  const isPositive = event.category === 'positive';
+  return (
+    <div className={`rounded-xl px-4 py-3 border text-sm ${isPositive
+      ? 'bg-emerald-950/20 border-emerald-900/30'
+      : 'bg-gray-950 border-gray-800'}`}
+    >
+      <div className="flex items-center gap-2 mb-1">
+        <span className={`text-xs font-semibold uppercase tracking-wide ${isPositive ? 'text-emerald-400' : 'text-cyan-400'}`}>
+          {categoryLabel[event.category] ?? event.category}
+        </span>
+      </div>
+      <p className={`leading-snug ${isPositive ? 'text-emerald-200' : 'text-gray-300'}`}>{event.message}</p>
+      {event.principle && !isPositive && (
+        <p className="text-gray-500 text-xs mt-1.5 italic">{event.principle}</p>
       )}
+    </div>
+  );
+}
+
+function StatCard({ label, value, unit, good }: { label: string; value: string | number; unit?: string; good?: boolean }) {
+  return (
+    <div className="rounded-xl bg-gray-950 border border-gray-800 px-4 py-3">
+      <p className="text-xs text-gray-600 mb-1">{label}</p>
+      <p className={`text-xl font-semibold tabular-nums ${good === true ? 'text-emerald-400' : good === false ? 'text-amber-400' : 'text-gray-200'}`}>
+        {value}
+      </p>
+      {unit && <p className="text-xs text-gray-600 mt-0.5">{unit}</p>}
+    </div>
+  );
+}
+
+function ScoreRow({ label, value }: { label: string; value: string }) {
+  const pct = SCORE_BAR[value] ?? 30;
+  const barColor = SCORE_BAR_COLOR[value] ?? 'bg-gray-600';
+  const textColor = value === 'strong' ? 'text-emerald-400' : value === 'moderate' ? 'text-amber-400' : 'text-violet-400';
+  return (
+    <div className="flex items-center gap-3">
+      <span className="w-28 text-xs text-gray-500 flex-shrink-0">{label}</span>
+      <div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden">
+        <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
+      </div>
+      <span className={`text-xs font-medium w-20 text-right capitalize ${textColor}`}>{value}</span>
     </div>
   );
 }

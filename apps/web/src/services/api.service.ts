@@ -58,9 +58,15 @@ export async function endSession(sessionId: string): Promise<SessionReport> {
   return data.report;
 }
 
-export async function getSessionReport(sessionId: string): Promise<SessionReport> {
-  const data = await fetchApi<{ report: SessionReport }>(`/sessions/${sessionId}/report`);
-  return data.report;
+export interface SessionReportFull {
+  report: SessionReport;
+  session: any;           // raw snake_case DB row
+  transcripts: any[];     // raw transcript_chunks rows
+  coachingEvents: any[];  // raw coaching_events rows
+}
+
+export async function getSessionReport(sessionId: string): Promise<SessionReportFull> {
+  return fetchApi<SessionReportFull>(`/sessions/${sessionId}/report`);
 }
 
 // Profile
