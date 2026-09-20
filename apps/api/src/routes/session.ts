@@ -216,10 +216,24 @@ sessionRouter.post('/:id/end', async (req, res) => {
   res.json({ report });
 });
 
-// GET /api/sessions/:id/report — fetch stored post-session report
+// GET /api/sessions/:id/report — fetch stored post-session report + transcript + session meta
 sessionRouter.get('/:id/report', (req, res) => {
   const db = getDb();
   const row = db.prepare('SELECT * FROM session_reports WHERE session_id = ?').get(req.params.id) as any;
   if (!row) return res.status(404).json({ error: 'Report not found' });
-  res.json({ report: JSON.parse(row.report_json) });
+
+  const session = db.prepare('SELECT * FROM sessions WHERE id = ?').get(req.params.id);
+  const transcripts = db.prepare(
+    'SELECT * FROM transcript_chunks WHERE session_id = ? ORDER BY timestamp ASC'
+  ).all(req.params.id);
+  const coachingEvents = db.prepare(
+    'SELECT * FROM coaching_events WHERE session_id = ? ORDER BY timestamp ASC'
+  ).all(req.params.id);
+
+  res.json({
+    report: JSON.parse(row.report_json),
+    session,
+    transcripts,
+    coachingEvents,
+  });
 });
