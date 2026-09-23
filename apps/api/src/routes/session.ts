@@ -28,11 +28,33 @@ sessionRouter.post('/', (req, res) => {
   res.status(201).json({ session });
 });
 
-// GET /api/sessions — list recent sessions
+// GET /api/sessions — list recent sessions with report snippet
 sessionRouter.get('/', (_req, res) => {
   const db = getDb();
-  const sessions = db.prepare('SELECT * FROM sessions ORDER BY started_at DESC LIMIT 20').all();
-  res.json({ sessions });
+  const sessions = db.prepare('SELECT * FROM sessions ORDER BY started_at DESC LIMIT 20').all() as any[];
+
+  // Attach a lightweight report snippet to each session that has one
+  const enriched = sessions.map((s: any) => {
+    const reportRow = db.prepare(
+      'SELECT report_json FROM session_reports WHERE session_id = ?'
+    ).get(s.id) as any;
+
+    let reportSnippet = null;
+    if (reportRow) {
+      try {
+        const r = JSON.parse(reportRow.report_json);
+        reportSnippet = {
+          oneLesson: r.oneLesson ?? null,
+          scores: r.scores ?? null,
+          wellDone: r.wellDone?.[0] ?? null,
+        };
+      } catch { /* ignore parse errors */ }
+    }
+
+    return { ...s, reportSnippet };
+  });
+
+  res.json({ sessions: enriched });
 });
 
 // GET /api/sessions/:id — get session detail
