@@ -29,7 +29,7 @@ export default function TranscriptFeed({ chunks, liveText }: { chunks: Transcrip
       {liveText && (
         <div className="flex gap-6">
            <div className="w-12 pt-1">
-             <div className="h-2 w-2 rounded-full bg-blue-500 animate-pulse ml-auto" />
+             <div className="h-2 w-2 rounded-full bg-violet-500 animate-pulse ml-auto" />
            </div>
            <div className="flex-1 text-gray-500 leading-relaxed italic">
              {liveText}

@@ -43,12 +43,12 @@ export default function CoachingOverlay({ events }: { events: CoachingEvent[] })
   let textColor = 'text-gray-300';
   
   if (isPositive) {
-    borderColor = 'border-green-900/50';
+    borderColor = 'border-emerald-900/50';
     icon = '🟢';
-    textColor = 'text-green-400';
+    textColor = 'text-emerald-400';
   } else {
     switch(visibleEvent.level) {
-      case 1: icon = '•'; textColor = 'text-gray-400'; break;
+      case 1: icon = '·'; textColor = 'text-gray-400'; break;
       case 2: icon = '🟡'; textColor = 'text-yellow-400'; borderColor = 'border-yellow-900/30'; break;
       case 3: icon = '🟠'; textColor = 'text-orange-400'; borderColor = 'border-orange-900/50'; break;
       case 4: icon = '🔴'; textColor = 'text-red-400'; borderColor = 'border-red-900/50'; break;
@@ -82,8 +82,8 @@ export default function CoachingOverlay({ events }: { events: CoachingEvent[] })
                   {expanded ? 'Hide Example' : 'See Example'}
                 </button>
                 {expanded && (
-                  <div className="mt-2 p-3 rounded-lg bg-gray-950/50 border border-gray-800 text-gray-300 text-sm">
-                    "{visibleEvent.suggestedVersion}"
+                  <div className="mt-2 p-3 rounded-lg bg-gray-950/50 border border-violet-900/20 text-gray-300 text-sm">
+                    <span className="text-gray-600 mr-1">Try:</span> {visibleEvent.suggestedVersion}
                   </div>
                 )}
               </div>
