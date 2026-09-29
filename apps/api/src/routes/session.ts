@@ -244,7 +244,15 @@ sessionRouter.post('/:id/end', async (req, res) => {
     new Date().toISOString(),
   );
 
-  db.prepare('UPDATE user_profile SET total_sessions = total_sessions + 1 WHERE id = 1').run();
+  // Update user profile — increment sessions + minutes, record last session timestamp
+  const durationMinutes = Math.max(1, Math.round(durationSeconds / 60)); // min 1 minute credit
+  db.prepare(`
+    UPDATE user_profile SET
+      total_sessions = total_sessions + 1,
+      total_minutes  = total_minutes + ?,
+      last_session_at = ?
+    WHERE id = 1
+  `).run(durationMinutes, endedAt);
 
   // Clean up in-memory state
   contextEngine.destroySession(sessionId);
