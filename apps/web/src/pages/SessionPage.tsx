@@ -17,8 +17,9 @@ export default function SessionPage() {
 
   const [mode, setMode] = useState<SessionMode>('conversation');
   const [duration, setDuration] = useState(0);
-  // Camera is OFF by default — user opts in before starting
-  const [wantCamera, setWantCamera] = useState(false);
+  const [wantCamera, setWantCamera] = useState(false); // camera OFF by default
+  const [isStarting, setIsStarting] = useState(false);
+  const [isEnding, setIsEnding] = useState(false);
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
@@ -31,13 +32,24 @@ export default function SessionPage() {
   }, [isActive]);
 
   const handleStart = async () => {
-    await startSession(mode, { camera: wantCamera });
+    setIsStarting(true);
+    try {
+      await startSession(mode, { camera: wantCamera });
+    } finally {
+      setIsStarting(false);
+    }
   };
 
   const handleEnd = async () => {
-    const result = await endSession();
-    if (result?.sessionId) {
-      navigate(`/report/${result.sessionId}`);
+    if (isEnding) return; // guard: prevent double-click
+    setIsEnding(true);
+    try {
+      const result = await endSession();
+      if (result?.sessionId) {
+        navigate(`/report/${result.sessionId}`);
+      }
+    } finally {
+      setIsEnding(false);
     }
   };
 
@@ -108,10 +120,11 @@ export default function SessionPage() {
 
           <button
             onClick={handleStart}
-            className="w-full bg-violet-600 hover:bg-violet-500 text-white font-medium p-4 rounded-xl transition-colors text-base flex items-center justify-center gap-2"
+            disabled={isStarting}
+            className="w-full bg-violet-600 hover:bg-violet-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-medium p-4 rounded-xl transition-colors text-base flex items-center justify-center gap-2"
           >
             <Mic size={20} />
-            Begin Session
+            {isStarting ? 'Starting…' : 'Begin Session'}
           </button>
         </div>
       </div>
@@ -158,10 +171,11 @@ export default function SessionPage() {
           <div className="w-px h-5 bg-gray-800 mx-1" />
           <button
             onClick={handleEnd}
-            className="flex items-center gap-2 px-4 py-2 bg-red-950/50 hover:bg-red-900/60 text-red-400 rounded-lg border border-red-900/50 font-medium text-sm transition-colors"
+            disabled={isEnding}
+            className="flex items-center gap-2 px-4 py-2 bg-red-950/50 hover:bg-red-900/60 disabled:opacity-50 disabled:cursor-not-allowed text-red-400 rounded-lg border border-red-900/50 font-medium text-sm transition-colors"
           >
             <Square size={13} className="fill-current" />
-            End Session
+            {isEnding ? 'Ending…' : 'End Session'}
           </button>
         </div>
       </div>

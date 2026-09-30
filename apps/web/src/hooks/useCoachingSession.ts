@@ -38,11 +38,18 @@ export function useCoachingSession() {
       store.setLiveTranscript('');
       const sessionId = activeSessionIdRef.current;
       if (!sessionId) return;
+
+      // ─── Build rolling transcript window from store ─────────────────────────
+      // The backend's context engine also maintains its own window, but sending
+      // the frontend's view gives Gemini consistent cross-request context and
+      // allows the backend to skip the context engine on simple chunks.
+      const window = store.transcriptChunks.slice(-10);
+
       try {
         await analyzeChunk(sessionId, {
           text,
           isFinal: true,
-          transcriptWindow: [],
+          transcriptWindow: window,
         });
       } catch (err) {
         console.error('Failed to analyze chunk:', err);

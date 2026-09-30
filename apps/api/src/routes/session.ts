@@ -5,7 +5,7 @@ import { contextEngine } from '../services/context-engine.service';
 import { coachingDecider } from '../services/coaching-decider.service';
 import { geminiService } from '../services/gemini.service';
 import { sseManager } from '../services/sse.service';
-import type { CoachingEvent, TranscriptChunk, SessionMode } from '@communication-agent/types';
+import type { CoachingEvent, TranscriptChunk, SessionMode, AnalyzeChunkPayload } from '@communication-agent/types';
 import { CoachingCategory, InterventionLevel } from '@communication-agent/types';
 
 export const sessionRouter = Router();
@@ -85,12 +85,20 @@ sessionRouter.get('/:id/stream', (req, res) => {
 // POST /api/sessions/:id/analyze — receive transcript chunk and trigger analysis
 sessionRouter.post('/:id/analyze', async (req, res) => {
   const sessionId = req.params.id;
-  const chunk = req.body as TranscriptChunk;
+  const payload = req.body as AnalyzeChunkPayload;
   const db = getDb();
 
-  // Ensure chunk has required fields
-  const chunkId = chunk.id || uuidv4();
-  const chunkTimestamp = chunk.timestamp || new Date().toISOString();
+  // Build a TranscriptChunk from the payload for DB storage and context engine
+  const chunkId = uuidv4();
+  const chunkTimestamp = new Date().toISOString();
+  const chunk: TranscriptChunk = {
+    id: chunkId,
+    sessionId,
+    text: payload.text,
+    isFinal: payload.isFinal,
+    speaker: 'user',
+    timestamp: chunkTimestamp,
+  };
 
   try {
     db.prepare(
@@ -142,13 +150,20 @@ sessionRouter.post('/:id/analyze', async (req, res) => {
       });
     }
 
-    // Gemini AI analysis
+    // Gemini AI analysis — backend context engine window takes priority;
+    // fall back to frontend's transcriptWindow when engine window is empty
+    // (e.g. first chunk, or after server restart recovery)
+    const frontendWindowText = (payload.transcriptWindow ?? [])
+      .map((c) => c.text)
+      .join(' ');
+    const effectiveWindow = contextAnalysis.transcriptWindowText || frontendWindowText;
+
     const session = db.prepare('SELECT * FROM sessions WHERE id = ?').get(sessionId) as any;
     const userProfile = db.prepare('SELECT * FROM user_profile WHERE id = 1').get() as any;
 
     const aiEvents = await geminiService.analyzeTranscript({
       transcript: chunk.text,
-      transcriptWindow: contextAnalysis.transcriptWindowText,
+      transcriptWindow: effectiveWindow,
       sessionMode: (session?.mode || 'conversation') as SessionMode,
       userProfile: userProfile,
       learningStage: (userProfile?.learning_stage || 1) as any,
@@ -229,7 +244,15 @@ sessionRouter.post('/:id/end', async (req, res) => {
     new Date().toISOString(),
   );
 
-  db.prepare('UPDATE user_profile SET total_sessions = total_sessions + 1 WHERE id = 1').run();
+  // Update user profile — increment sessions + minutes, record last session timestamp
+  const durationMinutes = Math.max(1, Math.round(durationSeconds / 60)); // min 1 minute credit
+  db.prepare(`
+    UPDATE user_profile SET
+      total_sessions = total_sessions + 1,
+      total_minutes  = total_minutes + ?,
+      last_session_at = ?
+    WHERE id = 1
+  `).run(durationMinutes, endedAt);
 
   // Clean up in-memory state
   contextEngine.destroySession(sessionId);
