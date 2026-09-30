@@ -255,6 +255,12 @@ function SessionCard({ session, onClick }: { session: RawSession; onClick: () =>
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
+          {/* Session title */}
+          <h3 className="text-sm font-medium text-gray-200 mb-1.5 truncate">
+            {session.title && session.title !== 'New Session'
+              ? session.title
+              : MODE_LABEL[session.mode] ?? session.mode}
+          </h3>
           {/* Top row: mode badge + date */}
           <div className="flex items-center gap-2 mb-2">
             <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-800 text-gray-300 border border-gray-700">

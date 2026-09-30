@@ -133,9 +133,15 @@ export default function ReportPage() {
         </div>
 
         <div>
-          <h1 className="text-2xl font-semibold text-white">Session Report</h1>
+          <h1 className="text-2xl font-semibold text-white">
+            {(session as any)?.title && (session as any).title !== 'New Session'
+              ? (session as any).title
+              : 'Session Report'}
+          </h1>
           <p className="text-gray-500 text-sm mt-1">
-            {session?.mode ? `${session.mode.charAt(0).toUpperCase()}${session.mode.slice(1)} session` : 'Session'}
+            {session?.mode
+              ? ({'practice': 'Free Speech', 'conversation': 'Conversation', 'presentation': 'Presentation'} as Record<string, string>)[session.mode] ?? session.mode
+              : 'Session'}
             {duration > 0 && <> · {formatDuration(duration)}</>}
             {wordCount > 0 && <> · {wordCount} words</>}
           </p>
