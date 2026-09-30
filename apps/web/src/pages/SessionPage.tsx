@@ -16,6 +16,7 @@ export default function SessionPage() {
   } = useCoachingSession();
 
   const [mode, setMode] = useState<SessionMode>('conversation');
+  const [sessionTitle, setSessionTitle] = useState('');
   const [duration, setDuration] = useState(0);
   const [wantCamera, setWantCamera] = useState(false); // camera OFF by default
   const [isStarting, setIsStarting] = useState(false);
@@ -31,10 +32,20 @@ export default function SessionPage() {
     return () => clearInterval(interval);
   }, [isActive]);
 
+  // Auto-generate a title if the user doesn't type one
+  const autoTitle = () => {
+    const hour = new Date().getHours();
+    const time = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
+    const day = new Date().toLocaleDateString(undefined, { weekday: 'long' });
+    const modeLabel = mode === 'practice' ? 'Free Speech' : mode.charAt(0).toUpperCase() + mode.slice(1);
+    return `${modeLabel} — ${day} ${time}`;
+  };
+
   const handleStart = async () => {
     setIsStarting(true);
     try {
-      await startSession(mode, { camera: wantCamera });
+      const title = sessionTitle.trim() || autoTitle();
+      await startSession(mode, { camera: wantCamera, title });
     } finally {
       setIsStarting(false);
     }
@@ -95,6 +106,24 @@ export default function SessionPage() {
             </div>
           </div>
 
+          {/* Session title */}
+          <div className="mb-6">
+            <label className="block text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">
+              Session Name <span className="text-gray-700 normal-case font-normal">· optional</span>
+            </label>
+            <input
+              type="text"
+              value={sessionTitle}
+              onChange={(e) => setSessionTitle(e.target.value)}
+              placeholder={`e.g. "Team standup practice"`}
+              maxLength={80}
+              className="w-full bg-gray-950 border border-gray-800 rounded-lg px-4 py-2.5 text-sm text-white placeholder-gray-700 focus:outline-none focus:border-violet-500/60 transition-colors"
+            />
+            <p className="text-xs text-gray-700 mt-1.5">
+              Leave blank to auto-name based on mode &amp; time of day.
+            </p>
+          </div>
+
           {/* Camera toggle */}
           <div className="mb-8">
             <label className="block text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">
@@ -145,6 +174,12 @@ export default function SessionPage() {
           </div>
           {/* Timer */}
           <div className="text-lg font-mono text-gray-300 tabular-nums">{formatTime(duration)}</div>
+          {/* Session title */}
+          {sessionTitle && (
+            <span className="text-xs text-gray-600 hidden sm:block truncate max-w-xs">
+              {sessionTitle}
+            </span>
+          )}
           {/* Recording status indicator */}
           <RecordingIndicator isListening={store.liveTranscript.length > 0 || store.transcriptChunks.length > 0} />
         </div>

@@ -119,6 +119,9 @@ sessionRouter.post('/:id/analyze', async (req, res) => {
     contextAnalysis = contextEngine.processChunk(sessionId, { ...chunk, id: chunkId, timestamp: chunkTimestamp });
   }
 
+  // Fetch profile once — used by both analysis and story detection
+  const userProfile = db.prepare('SELECT * FROM user_profile WHERE id = 1').get() as any;
+
   let allEvents: CoachingEvent[] = [];
 
   if (contextAnalysis.shouldTriggerAnalysis) {
@@ -159,7 +162,6 @@ sessionRouter.post('/:id/analyze', async (req, res) => {
     const effectiveWindow = contextAnalysis.transcriptWindowText || frontendWindowText;
 
     const session = db.prepare('SELECT * FROM sessions WHERE id = ?').get(sessionId) as any;
-    const userProfile = db.prepare('SELECT * FROM user_profile WHERE id = 1').get() as any;
 
     const aiEvents = await geminiService.analyzeTranscript({
       transcript: chunk.text,
@@ -199,6 +201,62 @@ sessionRouter.post('/:id/analyze', async (req, res) => {
       sseManager.sendEvent(sessionId, 'coaching', topEvent);
       coachingDecider.recordIntervention(sessionId, topEvent.level);
     }
+  }
+
+  // ── Story opportunity detection ────────────────────────────────────────────
+  // Only run for Stage 5+ users (storytelling coaching becomes active there).
+  // Fire-and-forget: runs in parallel, never blocks the response.
+  const storyDetectionAllowed = (userProfile?.learning_stage ?? 1) >= 5;
+  if (storyDetectionAllowed && chunk.text.length > 40) {
+    geminiService.detectStoryOpportunity(chunk.text).then((result) => {
+      if (!result.detected || !result.prompt) return;
+
+      // Save detected story opportunity to the stories table
+      const storyId = uuidv4();
+      const now = new Date().toISOString();
+      try {
+        db.prepare(
+          `INSERT INTO stories (id, title, raw_excerpt, session_id, topics_json, audience_types_json,
+           usable_situations_json, memorable_lines_json, alternative_openings_json, alternative_endings_json,
+           created_at, updated_at)
+           VALUES (?, ?, ?, ?, '[]', '[]', '[]', '[]', '[]', '[]', ?, ?)`
+        ).run(
+          storyId,
+          `Detected story — ${new Date().toLocaleDateString()}`,
+          chunk.text,
+          sessionId,
+          now,
+          now,
+        );
+      } catch (err) {
+        console.warn('Story insert warning:', err);
+      }
+
+      // Push a Gentle coaching event so user sees it in the overlay
+      const storyEvent: CoachingEvent = {
+        id: uuidv4(),
+        sessionId,
+        level: InterventionLevel.Gentle,
+        category: CoachingCategory.Storytelling,
+        message: result.prompt,
+        principle: 'Stories are remembered 22× longer than facts. Give us the narrative.',
+        triggerText: chunk.text,
+        timestamp: now,
+      };
+
+      // Save event to DB + surface via SSE
+      try {
+        db.prepare(
+          `INSERT INTO coaching_events (id, session_id, level, category, message, principle, trigger_text, suggested_version, timestamp)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).run(
+          storyEvent.id, sessionId, storyEvent.level, storyEvent.category,
+          storyEvent.message, storyEvent.principle, storyEvent.triggerText ?? null, null, now,
+        );
+      } catch { /* ignore duplicate inserts */ }
+
+      sseManager.sendEvent(sessionId, 'coaching', storyEvent);
+    }).catch((err) => console.warn('Story detection error:', err));
   }
 
   // Always echo transcript chunk via SSE for live display
