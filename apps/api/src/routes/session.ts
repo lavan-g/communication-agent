@@ -289,6 +289,29 @@ sessionRouter.post('/:id/end', async (req, res) => {
     wordCount, durationSeconds, sessionId
   );
 
+  // ── Silent session guard ──────────────────────────────────────────────────
+  // If no transcript was captured, skip Gemini entirely — the frontend shows
+  // a dedicated "Voxa didn't hear anything" screen for null reports.
+  if (wordCount === 0) {
+    console.log(`[session/${sessionId}] No transcript — skipping Gemini report generation.`);
+
+    // Still update profile session count + timestamp (the user tried, that counts)
+    const durationMinutes = Math.max(1, Math.round(durationSeconds / 60));
+    db.prepare(`
+      UPDATE user_profile SET
+        total_sessions = total_sessions + 1,
+        total_minutes  = total_minutes + ?,
+        last_session_at = ?
+      WHERE id = 1
+    `).run(durationMinutes, endedAt);
+
+    contextEngine.destroySession(sessionId);
+    coachingDecider.destroySession(sessionId);
+
+    // Return null report — frontend will show the silent session screen
+    return res.json({ report: null, silent: true });
+  }
+
   const report = await geminiService.generatePostSessionReport({
     session,
     transcript: transcripts,
@@ -323,9 +346,17 @@ sessionRouter.post('/:id/end', async (req, res) => {
 sessionRouter.get('/:id/report', (req, res) => {
   const db = getDb();
   const row = db.prepare('SELECT * FROM session_reports WHERE session_id = ?').get(req.params.id) as any;
-  if (!row) return res.status(404).json({ error: 'Report not found' });
 
   const session = db.prepare('SELECT * FROM sessions WHERE id = ?').get(req.params.id);
+
+  // Silent session: no report was generated — return session metadata so the
+  // frontend can render the "Voxa didn't hear anything" screen immediately
+  // without burning through its retry loop.
+  if (!row) {
+    if (!session) return res.status(404).json({ error: 'Session not found' });
+    return res.json({ report: null, session, transcripts: [], coachingEvents: [], silent: true });
+  }
+
   const transcripts = db.prepare(
     'SELECT * FROM transcript_chunks WHERE session_id = ? ORDER BY timestamp ASC'
   ).all(req.params.id);

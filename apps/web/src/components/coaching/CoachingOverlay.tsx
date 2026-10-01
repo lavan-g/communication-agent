@@ -26,9 +26,11 @@ export default function CoachingOverlay({ events }: { events: CoachingEvent[] })
     }
   }, [events]);
 
+  // NOTE: left-[220px] must match the sidebar width defined in App.tsx (w-[220px]).
+  // If the sidebar width ever changes, update both values together.
   if (!visibleEvent) {
     return (
-      <div className="fixed bottom-0 left-56 right-0 h-24 pointer-events-none">
+      <div className="fixed bottom-0 left-[220px] right-0 h-24 pointer-events-none">
         <div className="absolute top-4 right-8 pointer-events-auto">
            <FillerWordCounter events={events} />
         </div>

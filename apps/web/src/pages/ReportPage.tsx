@@ -110,6 +110,64 @@ export default function ReportPage() {
   const duration = session?.duration_seconds ?? 0;
   const hasRealData = fullTranscript.length > 0;
 
+  // ── Silent session: show a focused screen instead of a fabricated report ──
+  if (!hasRealData) {
+    return (
+      <div className="h-full overflow-y-auto">
+        <div className="max-w-lg mx-auto px-6 py-16 flex flex-col items-center text-center gap-6">
+
+          {/* Icon */}
+          <div className="w-16 h-16 rounded-full bg-gray-900 border border-gray-800 flex items-center justify-center">
+            <Mic size={28} className="text-gray-600" />
+          </div>
+
+          {/* Heading */}
+          <div>
+            <h1 className="text-xl font-semibold text-white mb-2">Voxa didn't hear anything</h1>
+            <p className="text-gray-500 text-sm leading-relaxed">
+              The session{duration > 0 ? ` ran for ${formatDuration(duration)}` : ''} but no speech was captured.
+              No coaching report was generated.
+            </p>
+          </div>
+
+          {/* Checklist */}
+          <div className="w-full bg-gray-900 border border-gray-800 rounded-2xl p-5 text-left space-y-3">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Check these before trying again</p>
+            {[
+              { ok: false, text: 'Browser mic permission granted — look for the mic icon in your address bar' },
+              { ok: false, text: 'You clicked "Begin Session" and the LIVE indicator turned on' },
+              { ok: false, text: 'You spoke clearly within 30cm of your mic' },
+              { ok: false, text: 'No other app (Zoom, Meet, etc.) is exclusively holding the mic' },
+              { ok: false, text: 'You\'re using Chrome or Edge — Safari has limited Speech API support' },
+            ].map((item, i) => (
+              <div key={i} className="flex items-start gap-3 text-sm text-gray-400">
+                <span className="mt-0.5 text-gray-700 flex-shrink-0">○</span>
+                {item.text}
+              </div>
+            ))}
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-3 w-full">
+            <button
+              onClick={() => navigate('/')}
+              className="flex-1 px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl text-sm font-medium transition-colors border border-gray-700"
+            >
+              Dashboard
+            </button>
+            <button
+              onClick={() => navigate('/session')}
+              className="flex-1 px-4 py-2.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-sm font-medium transition-colors"
+            >
+              Try again
+            </button>
+          </div>
+
+        </div>
+      </div>
+    );
+  }
+
   // Filler words from coaching events fired during session
   const fillerHits = (coachingEvents ?? []).filter((e: any) => e.category === 'filler_words');
   const totalFillers = report.speechPatterns?.fillerWordCount ?? fillerHits.length;
@@ -146,19 +204,6 @@ export default function ReportPage() {
             {wordCount > 0 && <> · {wordCount} words</>}
           </p>
         </div>
-
-        {/* ── No transcript warning ─────────────────────────────────── */}
-        {!hasRealData && (
-          <div className="flex items-start gap-3 px-4 py-3 bg-amber-950/30 border border-amber-900/40 rounded-xl text-sm">
-            <AlertCircle size={16} className="text-amber-400 mt-0.5 flex-shrink-0" />
-            <div>
-              <p className="text-amber-300 font-medium">No speech was captured in this session.</p>
-              <p className="text-amber-500/80 text-xs mt-0.5">
-                Voxa didn't receive any audio. Make sure you click "Begin Session", allow mic access, and speak clearly. The report below is a template.
-              </p>
-            </div>
-          </div>
-        )}
 
         {/* ── What you said (transcript) ────────────────────────────── */}
         {hasRealData && (
