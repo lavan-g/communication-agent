@@ -33,8 +33,35 @@ sessionRouter.get('/', (_req, res) => {
   const db = getDb();
   const sessions = db.prepare('SELECT * FROM sessions ORDER BY started_at DESC LIMIT 20').all() as any[];
 
+  // Mode → readable label (matches frontend MODE_LABEL map)
+  const modeLabel: Record<string, string> = {
+    conversation: 'Conversation',
+    presentation: 'Presentation',
+    practice: 'Free Speech',
+  };
+
+  // Generate a meaningful title from started_at for legacy sessions
+  function autoTitle(session: any): string {
+    const date = new Date(session.started_at);
+    const hour = date.getHours();
+    const timeOfDay = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
+    const day = date.toLocaleDateString('en-US', { weekday: 'long' });
+    const label = modeLabel[session.mode] ?? 'Session';
+    return `${label} — ${day} ${timeOfDay}`;
+  }
+
   // Attach a lightweight report snippet to each session that has one
   const enriched = sessions.map((s: any) => {
+    // Fix legacy 'New Session' / null titles — generate and persist a better one
+    if (!s.title || s.title === 'New Session') {
+      const generated = autoTitle(s);
+      try {
+        db.prepare("UPDATE sessions SET title = ? WHERE id = ? AND (title IS NULL OR title = 'New Session')")
+          .run(generated, s.id);
+      } catch { /* best-effort */ }
+      s = { ...s, title: generated };
+    }
+
     const reportRow = db.prepare(
       'SELECT report_json FROM session_reports WHERE session_id = ?'
     ).get(s.id) as any;
