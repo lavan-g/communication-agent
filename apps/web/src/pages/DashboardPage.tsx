@@ -112,6 +112,38 @@ export default function DashboardPage() {
   const totalMinutes = sessions.reduce((sum, s) => sum + Math.floor((s.duration_seconds || 0) / 60), 0);
   const stage = profile?.learning_stage ?? 1;
 
+  // ── Loading skeleton ──────────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="h-full overflow-y-auto">
+        <div className="max-w-3xl mx-auto px-6 py-8 space-y-7 animate-pulse">
+          {/* Greeting skeleton */}
+          <div className="space-y-2">
+            <div className="h-8 bg-gray-800 rounded-lg w-64" />
+            <div className="h-4 bg-gray-800/60 rounded w-80" />
+          </div>
+          {/* CTA button skeleton */}
+          <div className="h-20 bg-gray-800 rounded-2xl" />
+          {/* Stats row skeleton */}
+          <div className="grid grid-cols-3 gap-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-20 bg-gray-800 rounded-xl" />
+            ))}
+          </div>
+          {/* Stage card skeleton */}
+          <div className="h-32 bg-gray-800 rounded-xl" />
+          {/* Session cards skeleton */}
+          <div className="space-y-3">
+            <div className="h-5 bg-gray-800/60 rounded w-32" />
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-28 bg-gray-800 rounded-xl" />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full overflow-y-auto">
       <div className="max-w-3xl mx-auto px-6 py-8 space-y-7">
