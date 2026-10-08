@@ -112,6 +112,38 @@ export default function DashboardPage() {
   const totalMinutes = sessions.reduce((sum, s) => sum + Math.floor((s.duration_seconds || 0) / 60), 0);
   const stage = profile?.learning_stage ?? 1;
 
+  // ── Loading skeleton ──────────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="h-full overflow-y-auto">
+        <div className="max-w-3xl mx-auto px-6 py-8 space-y-7 animate-pulse">
+          {/* Greeting skeleton */}
+          <div className="space-y-2">
+            <div className="h-8 bg-gray-800 rounded-lg w-64" />
+            <div className="h-4 bg-gray-800/60 rounded w-80" />
+          </div>
+          {/* CTA button skeleton */}
+          <div className="h-20 bg-gray-800 rounded-2xl" />
+          {/* Stats row skeleton */}
+          <div className="grid grid-cols-3 gap-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-20 bg-gray-800 rounded-xl" />
+            ))}
+          </div>
+          {/* Stage card skeleton */}
+          <div className="h-32 bg-gray-800 rounded-xl" />
+          {/* Session cards skeleton */}
+          <div className="space-y-3">
+            <div className="h-5 bg-gray-800/60 rounded w-32" />
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-28 bg-gray-800 rounded-xl" />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full overflow-y-auto">
       <div className="max-w-3xl mx-auto px-6 py-8 space-y-7">
@@ -255,11 +287,9 @@ function SessionCard({ session, onClick }: { session: RawSession; onClick: () =>
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
-          {/* Session title */}
+          {/* Session title — backend now guarantees a meaningful title */}
           <h3 className="text-sm font-medium text-gray-200 mb-1.5 truncate">
-            {session.title && session.title !== 'New Session'
-              ? session.title
-              : MODE_LABEL[session.mode] ?? session.mode}
+            {session.title || MODE_LABEL[session.mode] || session.mode}
           </h3>
           {/* Top row: mode badge + date */}
           <div className="flex items-center gap-2 mb-2">
