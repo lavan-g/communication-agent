@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { getStories, createStory, deleteStory } from '../services/api.service';
+import { getStories, createStory, deleteStory, updateStory } from '../services/api.service';
 import type { Story, StoryTone } from '@communication-agent/types';
-import { Trash2, ChevronDown, ChevronUp, Plus, BookOpen, X } from 'lucide-react';
+import { Trash2, ChevronDown, ChevronUp, Plus, BookOpen, X, Sparkles, PenLine } from 'lucide-react';
 
 // ─── Add Story Modal ────────────────────────────────────────────────────────
 
@@ -137,10 +137,130 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 
 // ─── Main page ─────────────────────────────────────────────────────────────────
 
+// ─── Complete Story Modal (for auto-detected stubs) ─────────────────────────
+
+interface CompleteStoryModalProps {
+  story: Story;
+  onClose: () => void;
+  onSave: (story: Story) => void;
+}
+
+function CompleteStoryModal({ story, onClose, onSave }: CompleteStoryModalProps) {
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    title:     story.title.startsWith('Detected story') ? '' : story.title,
+    situation: story.situation ?? '',
+    conflict:  story.conflict  ?? '',
+    outcome:   story.outcome   ?? '',
+    lesson:    story.lesson    ?? '',
+    tone:      (story.tone ?? 'inspiring') as StoryTone,
+    topics:    story.topics?.join(', ') ?? '',
+  });
+
+  const set = (field: keyof typeof form) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+      setForm((f) => ({ ...f, [field]: e.target.value }));
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const updated = await updateStory(story.id!, {
+        title:     form.title.trim() || `Story — ${new Date().toLocaleDateString()}`,
+        situation: form.situation.trim() || undefined,
+        conflict:  form.conflict.trim()  || undefined,
+        outcome:   form.outcome.trim()   || undefined,
+        lesson:    form.lesson.trim()    || undefined,
+        tone:      form.tone,
+        topics:    form.topics ? form.topics.split(',').map((t) => t.trim()).filter(Boolean) : [],
+      });
+      onSave(updated);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-lg shadow-2xl">
+        <div className="flex items-center justify-between p-6 border-b border-gray-800">
+          <div>
+            <h2 className="text-lg font-semibold text-white">Complete this story</h2>
+            <p className="text-xs text-gray-500 mt-0.5">Voxa detected a story moment. Fill it in to save it properly.</p>
+          </div>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-300 transition-colors">
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Raw excerpt from session */}
+        {story.rawExcerpt && (
+          <div className="mx-6 mt-4 px-4 py-3 bg-gray-950 border border-gray-800 rounded-xl">
+            <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">What you said</p>
+            <p className="text-sm text-gray-400 italic leading-relaxed">"{story.rawExcerpt}"</p>
+          </div>
+        )}
+
+        <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+          <Field label="Story title *">
+            <input value={form.title} onChange={set('title')} placeholder="Give this story a name…" autoFocus
+              className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-violet-500 transition-colors" />
+          </Field>
+          <Field label="Situation" hint="Where were you? What was happening?">
+            <textarea value={form.situation} onChange={set('situation')} rows={2} placeholder="Set the scene…"
+              className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-violet-500 transition-colors resize-none" />
+          </Field>
+          <Field label="Conflict or challenge">
+            <textarea value={form.conflict} onChange={set('conflict')} rows={2} placeholder="What was the tension or problem?"
+              className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-violet-500 transition-colors resize-none" />
+          </Field>
+          <Field label="Outcome">
+            <textarea value={form.outcome} onChange={set('outcome')} rows={2} placeholder="How did it resolve?"
+              className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-violet-500 transition-colors resize-none" />
+          </Field>
+          <Field label="Core lesson">
+            <input value={form.lesson} onChange={set('lesson')} placeholder="What's the one-line takeaway?"
+              className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-violet-500 transition-colors" />
+          </Field>
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Tone">
+              <select value={form.tone} onChange={set('tone')}
+                className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500 transition-colors">
+                {(['inspiring','funny','vulnerable','dramatic','reflective','cautionary'] as StoryTone[]).map((t) => (
+                  <option key={t} value={t} className="capitalize">{t}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Topics" hint="comma-separated">
+              <input value={form.topics} onChange={set('topics')} placeholder="leadership, failure…"
+                className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-violet-500 transition-colors" />
+            </Field>
+          </div>
+        </div>
+
+        <div className="p-6 border-t border-gray-800 flex gap-3">
+          <button onClick={onClose}
+            className="flex-1 px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium rounded-xl transition-colors border border-gray-700">
+            Cancel
+          </button>
+          <button onClick={handleSave} disabled={saving}
+            className="flex-1 px-4 py-2.5 bg-violet-600 hover:bg-violet-500 disabled:opacity-60 text-white text-sm font-medium rounded-xl transition-colors">
+            {saving ? 'Saving…' : 'Save story'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main page ───────────────────────────────────────────────────────────────
+
 export default function StoriesPage() {
   const [stories, setStories] = useState<Story[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [completeTarget, setCompleteTarget] = useState<Story | null>(null);
 
   const fetchStories = async () => {
     try { setStories(await getStories()); } catch { /* ignore */ }
@@ -160,6 +280,15 @@ export default function StoriesPage() {
     setShowAddModal(false);
   };
 
+  const handleCompleted = (updated: Story) => {
+    setStories((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+    setCompleteTarget(null);
+  };
+
+  // A story is "incomplete" if it was auto-detected (has rawExcerpt but no situation filled in)
+  const isIncomplete = (s: Story) => !!(s.rawExcerpt && !s.situation && !s.conflict && !s.outcome);
+  const incompleteCount = stories.filter(isIncomplete).length;
+
   return (
     <div className="h-full overflow-y-auto">
       <div className="max-w-3xl mx-auto px-6 py-8">
@@ -170,7 +299,7 @@ export default function StoriesPage() {
             <h1 className="text-2xl font-semibold text-white">Story Bank</h1>
             <p className="text-sm text-gray-500 mt-1">
               {stories.length > 0
-                ? `${stories.length} ${stories.length === 1 ? 'story' : 'stories'} saved`
+                ? `${stories.length} ${stories.length === 1 ? 'story' : 'stories'} saved${incompleteCount > 0 ? ` · ${incompleteCount} to complete` : ''}`
                 : 'Your personal library of stories to use in any conversation.'}
             </p>
           </div>
@@ -207,8 +336,10 @@ export default function StoriesPage() {
                 key={story.id}
                 story={story}
                 isExpanded={expandedId === story.id}
+                incomplete={isIncomplete(story)}
                 onToggle={() => setExpandedId(expandedId === story.id ? null : story.id!)}
                 onDelete={() => handleDelete(story.id!)}
+                onComplete={() => setCompleteTarget(story)}
               />
             ))}
           </div>
@@ -218,23 +349,51 @@ export default function StoriesPage() {
       {showAddModal && (
         <AddStoryModal onClose={() => setShowAddModal(false)} onSave={handleSaved} />
       )}
+      {completeTarget && (
+        <CompleteStoryModal
+          story={completeTarget}
+          onClose={() => setCompleteTarget(null)}
+          onSave={handleCompleted}
+        />
+      )}
     </div>
   );
 }
 
 // ─── Story card ─────────────────────────────────────────────────────────────────
 
-function StoryCard({ story, isExpanded, onToggle, onDelete }: {
+function StoryCard({ story, isExpanded, incomplete, onToggle, onDelete, onComplete }: {
   story: Story;
   isExpanded: boolean;
+  incomplete?: boolean;
   onToggle: () => void;
   onDelete: () => void;
+  onComplete?: () => void;
 }) {
   return (
-    <div className={`bg-gray-900 border rounded-2xl overflow-hidden transition-colors ${isExpanded ? 'border-gray-700' : 'border-gray-800 hover:border-gray-700'}`}>
+    <div className={`bg-gray-900 border rounded-2xl overflow-hidden transition-colors ${
+      incomplete
+        ? 'border-amber-900/50 hover:border-amber-800/70'
+        : isExpanded ? 'border-gray-700' : 'border-gray-800 hover:border-gray-700'
+    }`}>
       <button className="w-full p-5 flex justify-between items-start text-left" onClick={onToggle}>
         <div className="flex-1 min-w-0 pr-4">
-          <h3 className="font-medium text-white text-base mb-2">{story.title}</h3>
+          {/* Detected badge for auto-detected incomplete stories */}
+          {incomplete && (
+            <div className="flex items-center gap-1.5 mb-2">
+              <Sparkles size={12} className="text-amber-400" />
+              <span className="text-xs text-amber-400 font-medium">Detected by Voxa · tap to complete</span>
+            </div>
+          )}
+          <h3 className="font-medium text-white text-base mb-2">
+            {story.title.startsWith('Detected story') ? 'Story moment detected' : story.title}
+          </h3>
+          {/* Show raw excerpt for detected stories */}
+          {incomplete && story.rawExcerpt && (
+            <p className="text-xs text-gray-500 italic leading-relaxed mb-2 line-clamp-2">
+              "{story.rawExcerpt}"
+            </p>
+          )}
           <div className="flex gap-2 flex-wrap items-center">
             {story.tone && (
               <span className="px-2 py-0.5 bg-gray-800 border border-gray-700 rounded-full text-xs text-gray-400 capitalize">
@@ -255,6 +414,19 @@ function StoryCard({ story, isExpanded, onToggle, onDelete }: {
 
       {isExpanded && (
         <div className="px-5 pb-5 border-t border-gray-800 space-y-4 bg-gray-950/30">
+          {/* Complete story CTA — shown prominently for incomplete detected stories */}
+          {incomplete && onComplete && (
+            <div className="pt-4">
+              <button
+                onClick={(e) => { e.stopPropagation(); onComplete(); }}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-amber-950/30 hover:bg-amber-950/50 border border-amber-900/50 hover:border-amber-800 text-amber-300 text-sm font-medium rounded-xl transition-colors"
+              >
+                <PenLine size={15} />
+                Complete this story
+              </button>
+            </div>
+          )}
+
           <div className="pt-4 space-y-4 text-sm">
             {story.situation && <DetailRow label="Situation" value={story.situation} />}
             {story.conflict && <DetailRow label="Conflict" value={story.conflict} />}
